@@ -15,6 +15,15 @@ import pytest
 from claude_backup_cron import scheduler
 from claude_backup_cron.errors import SchedulerError
 
+# cron is a POSIX feature. Windows has Task Scheduler, which is a
+# different shape entirely and not something this tool targets in
+# v0.1.0, so skip the whole module on Windows rather than stub a
+# Task-Scheduler equivalent that wouldn't exercise real code paths.
+pytestmark = pytest.mark.skipif(
+    os.name == "nt",
+    reason="cron is POSIX-only; Windows uses Task Scheduler (out of scope).",
+)
+
 
 def _install_stub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Put a fake ``crontab`` binary on PATH that stores state in tmp_path."""

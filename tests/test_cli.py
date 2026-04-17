@@ -11,14 +11,16 @@ from claude_backup_cron.cli import main
 
 
 def _write_config(tmp_path: Path, src: Path, dest: Path) -> Path:
+    # Use POSIX-style paths in TOML so Windows backslashes aren't
+    # interpreted as TOML escape sequences.
     cfg = tmp_path / "config.toml"
     cfg.write_text(
         "[[sources]]\n"
-        f'id = "s1"\npath = "{src}"\n'
+        f'id = "s1"\npath = "{src.as_posix()}"\n'
         "\n"
         "[[destinations]]\n"
-        f'id = "d1"\nkind = "local"\npath = "{dest}"\n'
-        f'\n[global]\nstate_dir = "{tmp_path / "state"}"\n',
+        f'id = "d1"\nkind = "local"\npath = "{dest.as_posix()}"\n'
+        f'\n[global]\nstate_dir = "{(tmp_path / "state").as_posix()}"\n',
         encoding="utf-8",
     )
     return cfg
@@ -88,7 +90,9 @@ def test_run_failure_exit_code_2(tmp_path: Path, capsys: pytest.CaptureFixture[s
     cfg = tmp_path / "config.toml"
     cfg.write_text(
         '[[sources]]\nid = "gone"\npath = "/this/does/not/exist"\n'
-        '\n[[destinations]]\nid = "d"\nkind = "local"\npath = "' + str(tmp_path / "out") + '"\n',
+        '\n[[destinations]]\nid = "d"\nkind = "local"\npath = "'
+        + (tmp_path / "out").as_posix()
+        + '"\n',
         encoding="utf-8",
     )
     rc = main(["--config", str(cfg), "run"])
