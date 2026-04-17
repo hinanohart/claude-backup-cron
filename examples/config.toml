@@ -1,0 +1,67 @@
+# claude-backup-cron reference config.
+#
+# Drop this at ~/.config/claude-backup-cron/config.toml, or point
+# $CLAUDE_BACKUP_CRON_CONFIG at it, then run `claude-backup-cron
+# show-config` to confirm it parses.
+
+[global]
+# Where artefacts and per-destination working clones live. Defaults to
+# $XDG_STATE_HOME/claude-backup-cron or ~/.local/state/claude-backup-cron.
+# Safe to delete — it'll be rebuilt on the next run.
+state_dir = "~/.local/state/claude-backup-cron"
+
+# Optional Discord / Slack webhook. Posted to only on failure, never
+# on success. Leave unset if you prefer your inbox quiet.
+# alert_webhook = "https://discord.com/api/webhooks/XXXXX/YYYYY"
+
+# -------- Sources -----------------------------------------------------
+#
+# Each source is one directory (or single file) that should be backed
+# up as a unit. Run the tool once per source; artefacts are named
+# `<id>-<digest>.tar`.
+
+[[sources]]
+id = "claude-memory"
+path = "~/.claude/projects/-workspace/memory"
+# Glob patterns relative to the source root. .git/* is worth excluding
+# if you keep the memory directory under version control separately.
+exclude = [".git/*", "*.swp", "*.tmp"]
+
+# [[sources]]
+# id = "dotfiles"
+# path = "~/dotfiles"
+# exclude = [".git/*"]
+
+# -------- Destinations ------------------------------------------------
+#
+# Each destination is tried independently. One failing destination does
+# not abort the others — the CLI exits 2 if any step failed, not 1.
+
+# Example 1: private GitHub repo, encrypted with age.
+[[destinations]]
+id = "private-github"
+kind = "git"
+remote = "git@github.com:me/claude-memory-backup.git"
+branch = "main"
+# Strongly recommended. Generate a key pair with `age-keygen`, commit
+# the recipient (age1...) here, keep the identity file (starts with
+# AGE-SECRET-KEY) somewhere *else* — otherwise the backup is no safer
+# than the repo itself.
+encrypt_to = "age1abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+# Example 2: S3 bucket (or S3-compatible — MinIO, Backblaze B2, etc.)
+# [[destinations]]
+# id = "s3-offsite"
+# kind = "s3"
+# bucket = "my-backup-bucket"
+# prefix = "claude-memory/"
+# encrypt_to = "age1abcdef..."
+# # For non-AWS S3 providers:
+# # s3_endpoint = "https://s3.example-provider.com"
+
+# Example 3: spare local drive. Retain the 14 most recent artefacts.
+# [[destinations]]
+# id = "usb-backup"
+# kind = "local"
+# path = "/mnt/backup/claude-memory"
+# retain = 14
