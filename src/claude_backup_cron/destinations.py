@@ -194,7 +194,23 @@ def dispatch_git(dest: DestinationSpec, upload: Upload, work_root: Path) -> str:
     # filename includes the digest), commit will return non-zero; treat
     # that as a successful no-op.
     commit_msg = f"backup: {upload.source_id}@{upload.digest[:12]} {datetime.now(UTC).isoformat()}"
-    r = _run(["git", "commit", "-m", commit_msg], cwd=clone)
+    # Inject a bot identity via -c so the commit works even when cron's
+    # empty environment has no global git user configured. The remote
+    # sees these strings in the commit log; they're intentionally
+    # obvious-bot so nobody mistakes them for a human author.
+    r = _run(
+        [
+            "git",
+            "-c",
+            "user.name=claude-backup-cron",
+            "-c",
+            "user.email=claude-backup-cron@noreply.invalid",
+            "commit",
+            "-m",
+            commit_msg,
+        ],
+        cwd=clone,
+    )
     if r.returncode != 0:
         if "nothing to commit" in (r.stdout + r.stderr).lower():
             return f"no-op (unchanged) on {dest.remote}"
