@@ -45,7 +45,8 @@ def test_expanduser_is_applied(tmp_path: Path) -> None:
 def test_explicit_state_dir_is_honoured(tmp_path: Path) -> None:
     body = _MIN + '\n[global]\nstate_dir = "/var/tmp/mystate"\n'
     cfg = load(_write(tmp_path, body))
-    assert str(cfg.global_.state_dir) == "/var/tmp/mystate"
+    # Path comparison (not string): Path normalises separators on Windows.
+    assert cfg.global_.state_dir == Path("/var/tmp/mystate")
 
 
 def test_alert_webhook_roundtrips(tmp_path: Path) -> None:
