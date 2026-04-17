@@ -1,0 +1,17 @@
+claude-backup-cron
+Copyright 2026 Hinano Hart
+
+This product contains no third-party source code. Runtime shells out to
+the following external binaries when their corresponding features are
+used:
+
+  * git  (https://git-scm.com/) — for the "git" destination kind.
+  * aws  (https://aws.amazon.com/cli/) — for the "s3" destination kind.
+  * age  (https://age-encryption.org/) — when any destination sets
+    encrypt_to.
+  * crontab — for install-cron / uninstall-cron subcommands.
+
+Each is invoked via subprocess with a fixed argv (no shell). The
+project is not affiliated with Anthropic; "Claude Code" is a product
+name of Anthropic, used here only to describe the tool's typical
+backup target.
