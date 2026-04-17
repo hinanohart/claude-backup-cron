@@ -12,6 +12,22 @@ codes and outputs are passed through as-is.
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-04-18
+
+### Changed
+
+- `dispatch_git` now passes a bot identity
+  (`-c user.name=claude-backup-cron -c user.email=<bot>@noreply.invalid`)
+  so backups work in minimal cron / CI environments that have no
+  `user.name` / `user.email` set globally.
+- Skip the whole `test_scheduler` module on Windows (cron is POSIX-only
+  and Task Scheduler is out of scope for v0.1).
+- `test_cli` and `test_config` now use POSIX-style paths when writing
+  TOML fixtures so Windows backslashes don't get interpreted as TOML
+  escape sequences.
+- `release.yml` now auto-creates a GitHub Release (with the built
+  wheel + sdist attached) after the PyPI publish succeeds.
+
 ## [0.1.0] — 2026-04-18
 
 ### Added
