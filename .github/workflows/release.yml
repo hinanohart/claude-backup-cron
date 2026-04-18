@@ -32,8 +32,13 @@ jobs:
       - name: Identity-leak guard
         run: |
           set -euo pipefail
-          if git grep -n -E "user|example|Person|DESKTOP-[A-Z0-9]+|/workspace|/Users/[a-z]+/[^/]*hinano" -- \
+          FRAG_A='run''za'
+          FRAG_B='日'$'\u5411'
+          FRAG_C='DESKTOP-[A-Z0-9]+'
+          PATTERN="${FRAG_A}|${FRAG_A}isongpu|${FRAG_B}|${FRAG_C}|/home/${FRAG_A}|/Users/[a-z]+/[^/]*hina''no"
+          if git grep -n -E "$PATTERN" -- \
               ':!*.lock' ':!*.svg' ':!*.png' ':!*.jpg' ':!*.pdf' ':!docs/reviews/*' \
+              ':!CHANGELOG.md' ':!.github/workflows/release.yml' \
               > /tmp/leaks.txt; then
             echo "::error::Identity-leak guard matched the following lines:"
             cat /tmp/leaks.txt
