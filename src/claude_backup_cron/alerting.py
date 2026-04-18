@@ -11,11 +11,19 @@ from __future__ import annotations
 import json
 import logging
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Final
 
 _LOG = logging.getLogger(__name__)
 _TIMEOUT_S: Final = 10
+
+# ``urllib.request.urlopen`` honours ``http``, ``https``, ``file``,
+# ``ftp``, and sometimes ``data``. If the config is ever attacker-
+# influenced, a ``file:///etc/passwd`` webhook turns the alerting path
+# into an SSRF/LFI primitive (the 2xx/non-2xx return value is a 1-bit
+# oracle). Restrict to HTTP(S) explicitly.
+_ALLOWED_SCHEMES: Final = frozenset({"http", "https"})
 
 
 def post(webhook_url: str, message: str) -> bool:
@@ -27,8 +35,16 @@ def post(webhook_url: str, message: str) -> bool:
     """
     if not webhook_url:
         return False
+    scheme = urllib.parse.urlsplit(webhook_url).scheme.lower()
+    if scheme not in _ALLOWED_SCHEMES:
+        _LOG.warning(
+            "alerting: refusing non-http(s) webhook scheme %r (got %r)",
+            scheme,
+            webhook_url[:60],
+        )
+        return False
     payload = json.dumps({"content": message[:1900]}).encode("utf-8")
-    req = urllib.request.Request(  # noqa: S310 — scheme is documented in config, not user-supplied at runtime.
+    req = urllib.request.Request(  # noqa: S310 — scheme allow-listed above.
         webhook_url,
         data=payload,
         headers={"Content-Type": "application/json"},

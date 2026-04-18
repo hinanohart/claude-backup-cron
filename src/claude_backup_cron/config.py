@@ -11,7 +11,7 @@ Layout (example)
 
    [[sources]]
    id = "claude-memory"
-   path = "~/.claude/projects/-workspace/memory"
+   path = "~/.claude/projects/-home-USER/memory"
    exclude = [".git/*", "*.swp"]
 
    [[destinations]]
@@ -168,7 +168,11 @@ def _parse_destination(entry: dict[str, Any], index: int) -> DestinationSpec:
     raw_path = entry.get("path")
     dest_path = _expand(raw_path) if raw_path is not None else None
     retain = entry.get("retain")
-    if retain is not None and (not isinstance(retain, int) or retain < 1):
+    # ``isinstance(True, int)`` is True in Python — reject booleans explicitly
+    # so ``retain = true`` doesn't silently become 1.
+    if retain is not None and (
+        not isinstance(retain, int) or isinstance(retain, bool) or retain < 1
+    ):
         raise ConfigError(f"destinations[{index}].retain must be a positive int")
 
     spec = DestinationSpec(
