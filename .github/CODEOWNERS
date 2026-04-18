@@ -1,0 +1,11 @@
+# Any change to this repo requires review from @hinanohart.
+# Without a CODEOWNERS file, "Require review from Code Owners" in branch
+# protection has no entries to enforce against — add one explicitly so a
+# single-account compromise can't self-merge a PR that disables a rule or
+# introduces a typosquat dependency.
+
+* @hinanohart
+
+# Workflow files are especially load-bearing: they carry the OIDC publish
+# token and the tag-push release trigger. Keep them pinned to owner review.
+/.github/ @hinanohart

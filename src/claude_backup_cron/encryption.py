@@ -15,16 +15,64 @@ three reasons:
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
 from claude_backup_cron.errors import EncryptionError
 
+# ``age`` accepts two recipient shapes:
+#   * X25519 ``age1…`` bech32 (``age-keygen`` output)
+#   * SSH public key — ``ssh-rsa …`` / ``ssh-ed25519 …`` / ``ecdsa-…``
+# Validate both; reject garbage like random strings or shell metachars.
+_AGE_RECIPIENT_RE = re.compile(
+    r"\A(?:"
+    r"age1[0-9a-z]{20,}"
+    r"|ssh-(?:rsa|ed25519)\s+[A-Za-z0-9+/=]+(?:\s+\S+)?"
+    r"|ecdsa-sha2-[a-z0-9-]+\s+[A-Za-z0-9+/=]+(?:\s+\S+)?"
+    r")\Z"
+)
+
+# ``age --version`` may emit any of:
+#   v1.2.0          (upstream build)
+#   1.2.0           (Homebrew formula)
+#   age version 1.1.1 (some distro packaging)
+#   v2.0.0          (hypothetical future release; accept)
+# Extract the first ``[v]?MAJOR.MINOR`` and require MAJOR >= 1.
+_AGE_VERSION_RE = re.compile(r"(?:^|\s)v?(\d+)\.(\d+)(?:\.\d+)?")
+
 
 def age_available() -> bool:
-    """Return True iff the ``age`` binary is on ``PATH``."""
-    return shutil.which("age") is not None
+    """Return True iff the ``age`` binary on ``PATH`` looks genuine.
+
+    ``shutil.which("age")`` alone is not enough: if ``$PATH`` contains a
+    user-writable directory before the system binary, an attacker who
+    lands code execution can plant an ``age`` shim that silently writes
+    plaintext under an ``.age`` filename. We additionally probe
+    ``age --version`` and require the output to name at least version 1.
+
+    The ``--version`` output is checked on both stdout and stderr because
+    different packaging flavours target different streams.
+    """
+    path = shutil.which("age")
+    if path is None:
+        return False
+    try:
+        proc = subprocess.run(  # noqa: S603 — fixed argv, no shell.
+            [path, "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    m = _AGE_VERSION_RE.search(combined)
+    if m is None:
+        return False
+    return int(m.group(1)) >= 1
 
 
 def encrypt_file(src: Path, dst: Path, recipient: str) -> None:
@@ -36,9 +84,15 @@ def encrypt_file(src: Path, dst: Path, recipient: str) -> None:
     """
     if not age_available():
         raise EncryptionError(
-            "age binary not found on PATH. Install from "
-            "https://age-encryption.org/ or drop the 'encrypt_to' key "
-            "if you genuinely want unencrypted uploads."
+            "age binary not found (or not a recognised age v1 build) on "
+            "PATH. Install the official age from https://age-encryption.org/ "
+            "or drop the 'encrypt_to' key if you genuinely want unencrypted "
+            "uploads."
+        )
+    if not _AGE_RECIPIENT_RE.match(recipient):
+        raise EncryptionError(
+            f"encrypt: recipient does not look like an age public key "
+            f"(expected ``age1...`` bech32, got {recipient[:12]!r})"
         )
     if not src.is_file():
         raise EncryptionError(f"encrypt: source does not exist: {src}")

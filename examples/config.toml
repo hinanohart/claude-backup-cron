@@ -22,7 +22,7 @@ state_dir = "~/.local/state/claude-backup-cron"
 
 [[sources]]
 id = "claude-memory"
-path = "~/.claude/projects/-home-runza/memory"
+path = "~/.claude/projects/-home-USER/memory"
 # Glob patterns relative to the source root. .git/* is worth excluding
 # if you keep the memory directory under version control separately.
 exclude = [".git/*", "*.swp", "*.tmp"]
@@ -47,7 +47,7 @@ branch = "main"
 # the recipient (age1...) here, keep the identity file (starts with
 # AGE-SECRET-KEY) somewhere *else* — otherwise the backup is no safer
 # than the repo itself.
-encrypt_to = "age1abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+encrypt_to = "age1YOUR_PUBLIC_RECIPIENT_HERE_RUN_age-keygen_TO_GENERATE"
 
 # Example 2: S3 bucket (or S3-compatible — MinIO, Backblaze B2, etc.)
 # [[destinations]]

@@ -77,6 +77,14 @@ def package(spec: SourceSpec, out_dir: Path) -> Artefact:
     if artefact_path.exists():
         return Artefact(source_id=spec.id, digest=digest, path=artefact_path)
 
+    # Resolve the source root once so the tar filter can reject entries
+    # whose live filesystem path escapes the tree — defeats the
+    # ``source/mem -> /etc`` directory-symlink attack that ``hash_tree``
+    # already blocks for hashing but ``tarfile.add`` would otherwise
+    # silently follow. ``strict=True`` raises if the root itself is
+    # missing, which is already caught by the ``exists()`` check above.
+    root_resolved = spec.path.resolve(strict=True)
+
     tmp = artefact_path.with_suffix(".tar.tmp")
     try:
         with tarfile.open(tmp, "w") as tf:
@@ -88,6 +96,23 @@ def package(spec: SourceSpec, out_dir: Path) -> Artefact:
                 ti.gid = 0
                 ti.uname = ""
                 ti.gname = ""
+                # Refuse symlinks / hardlinks outright.
+                if ti.issym() or ti.islnk():
+                    return None
+                # Resolve the candidate's *live* path and refuse anything
+                # that doesn't live inside ``root_resolved``. A directory
+                # symlink halfway down the walk would let tar follow into
+                # ``/etc`` even though each leaf is a regular file with
+                # ``issym() = False``; the resolve-under-root check catches
+                # that.
+                rel = ti.name[len(arcroot) + 1:] if ti.name.startswith(arcroot + "/") else ""
+                if rel:
+                    candidate = spec.path / rel
+                    try:
+                        if not candidate.resolve(strict=True).is_relative_to(root_resolved):
+                            return None
+                    except OSError:
+                        return None
                 return _filter_excluded(ti, spec.exclude, arcroot)
 
             tf.add(str(spec.path), arcname=arcroot, filter=_add_filter)

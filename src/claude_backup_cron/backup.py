@@ -9,6 +9,7 @@ S3 bucket doesn't block the git push that follows.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -56,11 +57,12 @@ def run(config: Config, *, dry_run: bool = False) -> RunReport:
     dispatch. A preview, in other words.
     """
     state_dir = config.global_.state_dir
-    state_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_private_dir(state_dir)
 
     pack_dir = state_dir / "packages"
     work_dir = state_dir / "work"
-    work_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_private_dir(pack_dir)
+    _ensure_private_dir(work_dir)
 
     results: list[StepResult] = []
 
@@ -86,6 +88,7 @@ def run(config: Config, *, dry_run: bool = False) -> RunReport:
 
     # Phase 2: for each (source, destination), encrypt if needed then dispatch.
     for artefact in artefacts:
+        encrypted_artefacts: list[Path] = []
         for dest in config.destinations:
             if dry_run:
                 results.append(
@@ -99,6 +102,8 @@ def run(config: Config, *, dry_run: bool = False) -> RunReport:
                 continue
             try:
                 to_upload = _maybe_encrypt(artefact.path, dest, work_dir)
+                if dest.encrypt_to is not None:
+                    encrypted_artefacts.append(to_upload)
                 up = destinations.Upload(
                     source_id=artefact.source_id,
                     digest=artefact.digest,
@@ -142,6 +147,14 @@ def run(config: Config, *, dry_run: bool = False) -> RunReport:
                 )
             )
 
+        if not dry_run:
+            # pack_dir is transient working space — scrub plaintext + encrypted
+            # copies once every destination for this artefact has been dispatched.
+            # The dest (repo/S3/local) is the durable store, not pack_dir.
+            for enc in encrypted_artefacts:
+                _safe_unlink(enc)
+            _safe_unlink(artefact.path)
+
     report = RunReport(dry_run=dry_run, results=tuple(results))
 
     if not dry_run and report.failed and config.global_.alert_webhook:
@@ -152,6 +165,23 @@ def run(config: Config, *, dry_run: bool = False) -> RunReport:
         )
 
     return report
+
+
+def _ensure_private_dir(path: Path) -> None:
+    """Create ``path`` with mode 0700 (owner-only), enforcing on existing dirs too."""
+    path.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(path, 0o700)
+    except OSError:
+        # Best-effort: on Windows / NFS / FUSE some chmods silently noop.
+        _LOG.debug("could not chmod 0700 on %s", path, exc_info=True)
+
+
+def _safe_unlink(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        _LOG.debug("could not unlink %s", path, exc_info=True)
 
 
 def _maybe_encrypt(

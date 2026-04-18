@@ -60,7 +60,7 @@ alert_webhook = "https://discord.com/api/webhooks/..."
 
 [[sources]]
 id = "claude-memory"
-path = "~/.claude/projects/-home-runza/memory"
+path = "~/.claude/projects/-home-USER/memory"
 exclude = [".git/*", "*.swp"]
 
 [[destinations]]

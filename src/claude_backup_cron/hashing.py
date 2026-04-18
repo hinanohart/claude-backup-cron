@@ -61,8 +61,19 @@ def hash_tree(
     if root.is_file():
         paths.append((root.name, root))
     else:
+        root_resolved = root.resolve()
         for p in root.rglob("*"):
             if not p.is_file() or p.is_symlink():
+                continue
+            # A symlinked *directory* anywhere on the walk path is still
+            # traversed by ``rglob`` (it only checks the final segment for
+            # ``is_symlink``). Resolve the candidate and refuse anything
+            # that escapes ``root`` — otherwise a ``source/mem -> ~/.ssh``
+            # symlink silently pulls the target into the backup.
+            try:
+                if not p.resolve(strict=True).is_relative_to(root_resolved):
+                    continue
+            except OSError:
                 continue
             rel_posix = p.relative_to(root).as_posix()
             if _should_skip(rel_posix, ex):
