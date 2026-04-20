@@ -43,8 +43,10 @@ _TOKEN_REDACTORS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(?:AKIA|ASIA|AGPA|AIDA|AROA|ANPA)[0-9A-Z]{16}\b"), "<aws-access-key>"),
     (re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b"), "<slack-token>"),
     (
-        re.compile(r"(?i)\b(?:Bearer|Authorization|token|password|api[_-]?key)"
-                   r"[\s=:]+['\"]?[A-Za-z0-9_./+=-]{8,}"),
+        re.compile(
+            r"(?i)\b(?:Bearer|Authorization|token|password|api[_-]?key)"
+            r"[\s=:]+['\"]?[A-Za-z0-9_./+=-]{8,}"
+        ),
         "<auth-header>",
     ),
     (re.compile(r"(?i)[?&](?:token|key|sig|access_token)=[^&\s]+"), r"=<redacted>"),
@@ -286,18 +288,14 @@ def dispatch_git(dest: DestinationSpec, upload: Upload, work_root: Path) -> str:
     if r.returncode != 0:
         if "nothing to commit" in (r.stdout + r.stderr).lower():
             return f"no-op (unchanged) on {_redact_url(dest.remote)}"
-        raise DestinationError(
-            f"git dest {dest.id!r}: commit failed: {_scrub(r.stderr.strip())}"
-        )
+        raise DestinationError(f"git dest {dest.id!r}: commit failed: {_scrub(r.stderr.strip())}")
 
     # ``--`` separator ensures ``branch`` is the positional refspec, not
     # a flag — defence in depth on top of _SAFE_BRANCH_RE.
     r = _run(["git", "push", "origin", "--", branch], cwd=clone)
     if r.returncode != 0:
         # Try --set-upstream for first-push case.
-        r2 = _run(
-            ["git", "push", "--set-upstream", "origin", "--", branch], cwd=clone
-        )
+        r2 = _run(["git", "push", "--set-upstream", "origin", "--", branch], cwd=clone)
         if r2.returncode != 0:
             raise DestinationError(
                 f"git dest {dest.id!r}: push failed: {_scrub(r2.stderr.strip())}"
@@ -327,7 +325,5 @@ def dispatch_s3(dest: DestinationSpec, upload: Upload) -> str:
 
     r = _run(argv)
     if r.returncode != 0:
-        raise DestinationError(
-            f"s3 dest {dest.id!r}: cp failed: {_scrub(r.stderr.strip())}"
-        )
+        raise DestinationError(f"s3 dest {dest.id!r}: cp failed: {_scrub(r.stderr.strip())}")
     return f"uploaded to {s3_uri}"
