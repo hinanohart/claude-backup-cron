@@ -105,7 +105,7 @@ def package(spec: SourceSpec, out_dir: Path) -> Artefact:
                 # ``/etc`` even though each leaf is a regular file with
                 # ``issym() = False``; the resolve-under-root check catches
                 # that.
-                rel = ti.name[len(arcroot) + 1:] if ti.name.startswith(arcroot + "/") else ""
+                rel = ti.name[len(arcroot) + 1 :] if ti.name.startswith(arcroot + "/") else ""
                 if rel:
                     candidate = spec.path / rel
                     try:
