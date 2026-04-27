@@ -26,12 +26,13 @@ when the corresponding feature is actually used.
 
 ## Why
 
-The existing `memory-backup.sh` that ships in many Claude Code setups
-is ~20 lines of bash: great for one machine, brittle in practice —
-silent on failure, no encryption, single destination, no change
-detection. This package is the "I want it to keep working while I'm
-not watching" version: strict typing, deterministic artefacts,
-structured failures, audit-friendly CLI.
+The default `memory-backup.sh` approach that ships in many Claude Code
+setups works well for single-machine, single-destination use — but it
+intentionally does not cover multi-destination failover, encryption,
+content-hash change detection, or structured failure reporting. This
+package adds those features for higher-reliability deployments where
+the operator is not watching the cron logs every day: strict typing,
+deterministic artefacts, structured failures, audit-friendly CLI.
 
 ## Install
 
