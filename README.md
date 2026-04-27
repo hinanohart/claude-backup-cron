@@ -4,6 +4,8 @@ Scheduled, encrypted backups for small-but-high-value directories —
 Claude Code's `memory/` folder in particular, but anything the shape
 would fit.
 
+> **Disclaimer:** This is an **independent third-party tool**. It is **not affiliated with, endorsed by, or sponsored by Anthropic**. "Claude" and "Claude Code" are trademarks of Anthropic and are used here nominatively to identify the directory layout this tool happens to back up.
+
 ## What it does
 
 * Tars each configured source directory into a deterministic artefact.
