@@ -38,9 +38,8 @@ def post(webhook_url: str, message: str) -> bool:
     scheme = urllib.parse.urlsplit(webhook_url).scheme.lower()
     if scheme not in _ALLOWED_SCHEMES:
         _LOG.warning(
-            "alerting: refusing non-http(s) webhook scheme %r (got %r)",
+            "alerting: refusing scheme %r (not http/https)",
             scheme,
-            webhook_url[:60],
         )
         return False
     payload = json.dumps({"content": message[:1900]}).encode("utf-8")
