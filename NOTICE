@@ -1,5 +1,5 @@
 claude-backup-cron
-Copyright 2026 Hinano Hart
+Copyright 2026 claude-backup-cron contributors
 
 This product contains no third-party source code. Runtime shells out to
 the following external binaries when their corresponding features are

@@ -9,7 +9,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10"
-authors = [{ name = "Hinano Hart", email = "hinanohart@gmail.com" }]
+authors = [{ name = "claude-backup-cron contributors" }]
 keywords = [
   "backup",
   "claude-code",
