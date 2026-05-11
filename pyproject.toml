@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "claude-backup-cron"
 description = "Scheduled encrypted backups for Claude Code memory and similar small directories."
 readme = "README.md"
-license = "Apache-2.0"
+license = "MIT"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10"
 authors = [{ name = "claude-backup-cron contributors" }]
