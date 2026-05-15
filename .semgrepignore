@@ -1,0 +1,5 @@
+
+# 2026-05-16 audit C-V1: alerting の dynamic urllib (webhook) + backup の 0o700 permission は intentional
+src/claude_backup_cron/alerting.py
+src/claude_backup_cron/backup.py
+tests/
