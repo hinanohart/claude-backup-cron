@@ -180,6 +180,28 @@ Mix and match — having one `git` destination for history and one
 See [`SECURITY.md`](SECURITY.md) for the vulnerability reporting
 process.
 
+## Verification (sigstore)
+
+Releases from **v_next_** (released after 2026-05-16) include a sigstore keyless signature bundle
+(`.sigstore` per artifact) attached to the GitHub Release.
+
+### Verify a PyPI install
+
+```bash
+pip download <pkg-name>==<version> --no-deps -d ./verify
+python -m sigstore verify github \
+    --cert-identity 'https://github.com/hinanohart/claude-backup-cron/.github/workflows/release.yml@refs/tags/v<version>' \
+    --cert-oidc-issuer 'https://token.actions.githubusercontent.com' \
+    ./verify/*.whl ./verify/*.tar.gz
+```
+
+The corresponding `.sigstore` bundles can be downloaded from the GitHub Release page.
+
+### Historic releases (pre-2026-05-16)
+
+Earlier releases were published without sigstore bundles. Re-installing those versions
+provides no cryptographic provenance — pin to a current release if assurance matters.
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
