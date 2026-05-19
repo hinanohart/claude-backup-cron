@@ -205,3 +205,52 @@ provides no cryptographic provenance — pin to a current release if assurance m
 ## License
 
 MIT. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+
+## Why not just `age + cron + git push` in a shell script?
+
+Fair question, and it's the first thing anyone with a 50-line backup
+shell script will reach for. The honest answer is that nine of the
+eight CVE-class fixes that landed in v0.1.2 were **not** about
+cleverness — they were about cases the shell version was getting
+silently wrong:
+
+- **Token redaction in destination logs.** When `git push` to a
+  private remote fails, its stderr contains the URL + auth token if
+  the remote was configured with one. Four token shapes are stripped
+  from any captured output before it reaches the alerting webhook
+  or the local error log.
+- **Branch-name injection.** A user-controlled `dest.git.branch`
+  string could be `main; rm -rf $HOME` if the shell variant
+  interpolated it into a `git push` command line. The `_SAFE_BRANCH_RE`
+  whitelist refuses anything outside `[A-Za-z0-9._/-]`.
+- **Symlink-escape on tar.** `tarfile.open` follows symlinks by
+  default; a symlink pointing outside the source dir would let the
+  archive include unrelated files. Each member's resolved path is
+  re-checked against the source root with `Path.is_relative_to`.
+- **Cron-expression injection.** `_CRON_EXPRESSION_RE` rejects any
+  `crontab` entry that doesn't parse as a 5-field schedule, so a
+  hostile config file can't sneak `* * * * *` followed by a backslash
+  newline into the user's crontab.
+- **`age` binary impostor.** `age --version` is parsed and matched
+  against an expected prefix before any encryption pipeline runs.
+  A `PATH`-collision dropping a shim would otherwise produce
+  ciphertext readable by the attacker.
+- **Webhook scheme allow-list.** Discord/Slack alerting URLs are
+  passed through `_ALLOWED_SCHEMES` (`https://` only), so a
+  redirected config can't smuggle `file://` or `gopher://` reads
+  out via the webhook channel.
+- **Atomic private-dir creation.** The state dir is `mkdir`'d with
+  mode `0o700` in one syscall, not `mkdir` + `chmod`, so there is no
+  window where the dir exists with default umask permissions.
+
+Could you write all of that in shell? Yes — but every one of them is
+an easy thing to forget, and every one of them is a place where a
+secret leaves the trust boundary. The Python package exists so the
+checks live in one place with tests, not so it is "fancier" than a
+script. If your threat model genuinely doesn't include any of those
+attack paths, a shell script is the right answer.
+
+The 2026-05-09 audit explicitly considered consolidating this back
+into a thin shell variant and rejected it on the grounds above. That
+record is preserved in the failure museum so the next audit doesn't
+have to re-derive it.
