@@ -16,6 +16,9 @@ permissions:
 
 jobs:
   greet:
+    # Skip automated actors (e.g. Dependabot): first-interaction is for human
+    # first-time contributors and errors on bot-authored PRs.
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
       # actions/first-interaction@v1.3.0 — pinned by SHA per security best practice
