@@ -24,15 +24,15 @@ jobs:
       # actions/first-interaction@v1.3.0 — pinned by SHA per security best practice
       - uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          issue_message: |
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: |
             👋 Thanks for opening your first issue here!
 
             A maintainer will look at it soon. Meanwhile:
             - For **general questions**, please use the Discussions tab instead.
             - For **security reports**, please use private advisories (Security tab → Report a vulnerability).
             - Contributing guide: https://github.com/hinanohart/.github/blob/main/CONTRIBUTING.md
-          pr_message: |
+          pr-message: |
             🎉 Thanks for your first pull request!
 
             A few things that help reviews go faster:
