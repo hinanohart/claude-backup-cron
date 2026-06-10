@@ -20,25 +20,9 @@ External binaries (`git`, `aws`, `age`, `crontab`) are invoked only when the cor
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    Config[config.toml] --> CLI[claude-backup-cron CLI]
-    CLI --> run_cmd[run command]
-    run_cmd --> sources_pkg[sources.package<br>tar + hash check]
-    sources_pkg --> encrypt{encrypt_to<br>set?}
-    encrypt -- yes --> age_enc[age encryption]
-    encrypt -- no --> dest_dispatch
-    age_enc --> dest_dispatch[destinations dispatch]
-    dest_dispatch --> git_dest[git remote]
-    dest_dispatch --> s3_dest[S3 bucket]
-    dest_dispatch --> local_dest[local path]
-    git_dest --> report[RunReport]
-    s3_dest --> report
-    local_dest --> report
-    report --> alert{Any<br>failure?}
-    alert -- yes --> webhook[Webhook alert<br>Discord or Slack]
-    alert -- no --> exit0[exit 0]
-```
+<div align="center">
+  <img src="docs/architecture.png" alt="claude-backup-cron architecture" width="840">
+</div>
 
 ---
 
@@ -212,3 +196,4 @@ Earlier releases (pre-2026-05-16) were published without sigstore bundles.
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
+

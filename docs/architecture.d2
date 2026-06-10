@@ -1,0 +1,58 @@
+direction: down
+explanation: |md
+  ### claude-backup-cron
+  **Scheduled, encrypted backups for small-but-high-value directories — Claude Code's memory/ folder in particular.**
+| {near: top-center}
+
+config: "① config.toml" {shape: cylinder; style: {fill: "#6366f1"; font-color: "#ffffff"; stroke: "#4338ca"; bold: true; font-size: 18}}
+cli: "② claude-backup-cron CLI" {shape: oval; style: {fill: "#6366f1"; font-color: "#ffffff"; stroke: "#4338ca"; bold: true; font-size: 18}}
+run_cmd: "③ run command" {style: {fill: "#0ea5e9"; font-color: "#ffffff"; stroke: "#0369a1"; bold: true; font-size: 18}}
+
+package_zone: "Packaging" {
+  style: {fill: "#f0fdf4"; stroke: "#10b981"; font-color: "#065f46"; bold: true; font-size: 16}
+  pkg: "sources.package\ntar + hash check"
+  enc: "④ age encryption"
+  pkg.style: {fill: "#dcfce7"; font-color: "#065f46"}
+  enc.style: {fill: "#dcfce7"; font-color: "#065f46"}
+}
+
+dest_zone: "Destinations" {
+  style: {fill: "#fffbeb"; stroke: "#f59e0b"; font-color: "#92400e"; bold: true; font-size: 16}
+  git_dest: "git remote"
+  s3_dest: "S3 bucket"
+  local_dest: "local path"
+  git_dest.style: {fill: "#fef3c7"; font-color: "#92400e"}
+  s3_dest.style: {fill: "#fef3c7"; font-color: "#92400e"}
+  local_dest.style: {fill: "#fef3c7"; font-color: "#92400e"}
+}
+
+report: "⑤ RunReport" {style: {fill: "#0ea5e9"; font-color: "#ffffff"; stroke: "#0369a1"; bold: true; font-size: 16}}
+
+alert_zone: "Alert" {
+  style: {fill: "#fdf2f8"; stroke: "#ec4899"; font-color: "#9d174e"; bold: true; font-size: 16}
+  webhook: "⑥ Webhook alert\nDiscord or Slack"
+  exit0: "exit 0"
+  webhook.style: {fill: "#fdf2f8"; font-color: "#9d174e"}
+  exit0.style: {fill: "#fdf2f8"; font-color: "#9d174e"}
+}
+
+config -> cli: "① configure"
+cli -> run_cmd: "② invoke"
+run_cmd -> package_zone.pkg: "③ package"
+package_zone.pkg -> package_zone.enc: "④ encrypt"
+package_zone.enc -> dest_zone.git_dest: "⑤ dispatch"
+package_zone.enc -> dest_zone.s3_dest: "⑤ dispatch"
+package_zone.enc -> dest_zone.local_dest: "⑤ dispatch"
+package_zone.pkg -> dest_zone.git_dest: "⑤ dispatch (no enc)"
+dest_zone.git_dest -> report: "⑤ result"
+dest_zone.s3_dest -> report: "⑤ result"
+dest_zone.local_dest -> report: "⑤ result"
+report -> alert_zone.webhook: "⑥ failure"
+report -> alert_zone.exit0: "⑥ success"
+
+legend: "Legend" {
+  near: bottom-center
+  style: {fill: "#f8fafc"; stroke: "#cbd5e1"; font-size: 13}
+  e: "● entry/CLI"; c: "● core"; p: "● packaging"; b: "● destinations"; d: "● output/alert"
+  e.style.font-color: "#4338ca"; c.style.font-color: "#0369a1"; p.style.font-color: "#10b981"; b.style.font-color: "#f59e0b"; d.style.font-color: "#ec4899"
+}
