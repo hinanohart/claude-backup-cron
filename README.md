@@ -18,10 +18,10 @@ External binaries (`git`, `aws`, `age`, `crontab`) are invoked only when the cor
 flowchart TD
     Config[config.toml] --> CLI[claude-backup-cron CLI]
     CLI --> run_cmd[run command]
-    run_cmd --> sources_pkg[sources.package\ntar + hash check]
-    sources_pkg --> changed{Content\nchanged?}
-    changed -- no --> skip[Skip destination\nno upload]
-    changed -- yes --> encrypt{encrypt_to\nset?}
+    run_cmd --> sources_pkg[sources.package<br>tar + hash check]
+    sources_pkg --> changed{Content<br>changed?}
+    changed -- no --> skip[Skip destination<br>no upload]
+    changed -- yes --> encrypt{encrypt_to<br>set?}
     encrypt -- yes --> age_enc[age encryption]
     encrypt -- no --> dest_dispatch
     age_enc --> dest_dispatch[destinations dispatch]
@@ -31,8 +31,8 @@ flowchart TD
     git_dest --> report[RunReport]
     s3_dest --> report
     local_dest --> report
-    report --> alert{Any\nfailure?}
-    alert -- yes --> webhook[Webhook alert\nDiscord or Slack]
+    report --> alert{Any<br>failure?}
+    alert -- yes --> webhook[Webhook alert<br>Discord or Slack]
     alert -- no --> exit0[exit 0]
 ```
 
