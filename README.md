@@ -191,7 +191,7 @@ See [`SECURITY.md`](SECURITY.md) for the vulnerability reporting process.
 
 ## Verification (sigstore)
 
-Releases from **v_next_** (released after 2026-05-16) include a sigstore keyless signature bundle (`.sigstore` per artifact) attached to the GitHub Release.
+Releases from **v0.1.3** (released after 2026-05-16) include a sigstore keyless signature bundle (`.sigstore` per artifact) attached to the GitHub Release.
 
 ```bash
 pip download <pkg-name>==<version> --no-deps -d ./verify
