@@ -207,4 +207,4 @@ Earlier releases (pre-2026-05-16) were published without sigstore bundles.
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+MIT. See [`LICENSE`](LICENSE).
