@@ -43,8 +43,8 @@ _AGE_RECIPIENT_RE = re.compile(
 _AGE_VERSION_RE = re.compile(r"(?:^|\s)v?(\d+)\.(\d+)(?:\.\d+)?")
 
 
-def age_available() -> bool:
-    """Return True iff the ``age`` binary on ``PATH`` looks genuine.
+def _resolve_age() -> str | None:
+    """Return the absolute path of a genuine ``age`` binary, else ``None``.
 
     ``shutil.which("age")`` alone is not enough: if ``$PATH`` contains a
     user-writable directory before the system binary, an attacker who
@@ -54,10 +54,15 @@ def age_available() -> bool:
 
     The ``--version`` output is checked on both stdout and stderr because
     different packaging flavours target different streams.
+
+    The returned absolute path is what callers MUST invoke: re-resolving
+    the bare name ``"age"`` through ``$PATH`` at call time would reopen the
+    very shim-planting window this check exists to close (a TOCTOU between
+    validation and execution).
     """
     path = shutil.which("age")
     if path is None:
-        return False
+        return None
     try:
         proc = subprocess.run(  # noqa: S603 — fixed argv, no shell.
             [path, "--version"],
@@ -67,12 +72,22 @@ def age_available() -> bool:
             timeout=5,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return False
+        return None
     combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
     m = _AGE_VERSION_RE.search(combined)
     if m is None:
-        return False
-    return int(m.group(1)) >= 1
+        return None
+    if int(m.group(1)) < 1:
+        return None
+    return path
+
+
+def age_available() -> bool:
+    """Return True iff the ``age`` binary on ``PATH`` looks genuine.
+
+    Thin boolean wrapper around :func:`_resolve_age`.
+    """
+    return _resolve_age() is not None
 
 
 def encrypt_file(src: Path, dst: Path, recipient: str) -> None:
@@ -82,7 +97,8 @@ def encrypt_file(src: Path, dst: Path, recipient: str) -> None:
     not fall back to plaintext — the whole point of ``encrypt_to`` is
     that the destination should never see plaintext.
     """
-    if not age_available():
+    age_path = _resolve_age()
+    if age_path is None:
         raise EncryptionError(
             "age binary not found (or not a recognised age v1 build) on "
             "PATH. Install the official age from https://age-encryption.org/ "
@@ -100,7 +116,7 @@ def encrypt_file(src: Path, dst: Path, recipient: str) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     try:
         proc = subprocess.run(  # noqa: S603 — fixed argv, no shell.
-            ["age", "--recipient", recipient, "--output", str(dst), str(src)],
+            [age_path, "--recipient", recipient, "--output", str(dst), str(src)],
             capture_output=True,
             text=True,
             check=False,
