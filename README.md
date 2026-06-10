@@ -19,9 +19,7 @@ flowchart TD
     Config[config.toml] --> CLI[claude-backup-cron CLI]
     CLI --> run_cmd[run command]
     run_cmd --> sources_pkg[sources.package<br>tar + hash check]
-    sources_pkg --> changed{Content<br>changed?}
-    changed -- no --> skip[Skip destination<br>no upload]
-    changed -- yes --> encrypt{encrypt_to<br>set?}
+    sources_pkg --> encrypt{encrypt_to<br>set?}
     encrypt -- yes --> age_enc[age encryption]
     encrypt -- no --> dest_dispatch
     age_enc --> dest_dispatch[destinations dispatch]
@@ -116,7 +114,7 @@ The installer manages a single block in your user crontab, marked with `# claude
 
 ## How it works
 
-**Phase 1 — Package sources.** Each source directory is tarballed with mtime/uid/gid zeroed so the same tree always produces the same bytes. A SHA-256 content hash is compared against the previous run's state; if nothing changed, the destination upload is skipped entirely.
+**Phase 1 — Package sources.** Each source directory is tarballed with mtime/uid/gid zeroed so the same tree always produces the same bytes. A SHA-256 content hash is computed; the hash is embedded in the artefact filename so an identical tree reuses the same package within a run.
 
 **Phase 2 — Encrypt (optional).** If `encrypt_to` is set, the artefact is piped through `age --recipient <...>` before it ever reaches a destination. If `age` is missing or fails, the destination fails — it does not fall back to uploading plaintext.
 
@@ -169,11 +167,11 @@ age --decrypt -i ~/.ssh/my-age-key claude-memory-abc123.tar.age \
 
 Seven issues addressed over the v0.1.x series that a naive shell script would get silently wrong:
 
-- **Token redaction in destination logs.** `git push` stderr can contain auth tokens; four token shapes are stripped before the output reaches the webhook or log.
+- **Token redaction in destination logs.** `git push` stderr can contain auth tokens; five token shapes are stripped before the output reaches the webhook or log.
 - **Branch-name injection.** `_SAFE_BRANCH_RE` rejects anything outside `[A-Za-z0-9._/-]`.
 - **Symlink-escape on tar.** Each member's resolved path is re-checked against the source root with `Path.is_relative_to`.
 - **Cron-expression injection.** `_CRON_EXPRESSION_RE` rejects any entry that doesn't parse as a 5-field schedule.
-- **`age` binary impostor.** `age --version` is parsed and matched against an expected prefix before any encryption pipeline runs.
+- **`age` binary impostor.** `age --version` is parsed and the major version is required to be at least 1 before any encryption pipeline runs.
 - **Webhook scheme allow-list.** Only `http://` and `https://` URLs are accepted; `file://`, `gopher://`, and other schemes are rejected.
 - **Atomic private-dir creation.** State dirs are created with mode `0o700` in one syscall.
 
