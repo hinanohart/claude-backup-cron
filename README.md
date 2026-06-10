@@ -167,14 +167,14 @@ age --decrypt -i ~/.ssh/my-age-key claude-memory-abc123.tar.age \
 
 ## Security hardening
 
-Nine issues addressed over the v0.1.x series that a naive shell script would get silently wrong:
+Seven issues addressed over the v0.1.x series that a naive shell script would get silently wrong:
 
 - **Token redaction in destination logs.** `git push` stderr can contain auth tokens; four token shapes are stripped before the output reaches the webhook or log.
 - **Branch-name injection.** `_SAFE_BRANCH_RE` rejects anything outside `[A-Za-z0-9._/-]`.
 - **Symlink-escape on tar.** Each member's resolved path is re-checked against the source root with `Path.is_relative_to`.
 - **Cron-expression injection.** `_CRON_EXPRESSION_RE` rejects any entry that doesn't parse as a 5-field schedule.
 - **`age` binary impostor.** `age --version` is parsed and matched against an expected prefix before any encryption pipeline runs.
-- **Webhook scheme allow-list.** Only `https://` URLs are accepted; `file://` or `gopher://` are rejected.
+- **Webhook scheme allow-list.** Only `http://` and `https://` URLs are accepted; `file://`, `gopher://`, and other schemes are rejected.
 - **Atomic private-dir creation.** State dirs are created with mode `0o700` in one syscall.
 
 See [`SECURITY.md`](SECURITY.md) for the vulnerability reporting process.
