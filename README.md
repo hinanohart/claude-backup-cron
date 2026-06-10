@@ -1,11 +1,17 @@
 # claude-backup-cron
 
-> **Disclaimer:** This is an **independent third-party tool**. It is **not affiliated with, endorsed by, or sponsored by Anthropic**. "Claude" and "Claude Code" are trademarks of Anthropic and are used here nominatively to identify the directory layout this tool happens to back up.
-
 Scheduled, encrypted backups for small-but-high-value directories —
 Claude Code's `memory/` folder in particular, but anything the shape would fit.
 
-**What makes it different from a shell script:** content-hash change detection (mtime lies), optional `age` encryption that refuses to silently downgrade to plaintext, independent per-destination failure handling, structured failure alerts to Discord/Slack, and security hardening against token leakage in logs, branch-name injection, symlink escape, and cron-expression injection.
+> **Disclaimer:** This is an **independent third-party tool**. It is **not affiliated with, endorsed by, or sponsored by Anthropic**. "Claude" and "Claude Code" are trademarks of Anthropic and are used here nominatively to identify the directory layout this tool happens to back up.
+
+**What makes it different from a shell script:**
+
+- Content-hash change detection (mtime lies)
+- Optional `age` encryption that refuses to silently downgrade to plaintext
+- Independent per-destination failure handling
+- Structured failure alerts to Discord/Slack
+- Security hardening against token leakage in logs, branch-name injection, symlink escape, and cron-expression injection
 
 Zero runtime dependencies on Python 3.11+; `tomli` backport on 3.10.
 External binaries (`git`, `aws`, `age`, `crontab`) are invoked only when the corresponding feature is actually used.
@@ -114,13 +120,13 @@ The installer manages a single block in your user crontab, marked with `# claude
 
 ## How it works
 
-**Phase 1 — Package sources.** Each source directory is tarballed with mtime/uid/gid zeroed so the same tree always produces the same bytes. A SHA-256 content hash is computed; the hash is embedded in the artefact filename so an identical tree reuses the same package within a run.
+1. **Package sources.** Each source directory is tarballed with mtime/uid/gid zeroed so the same tree always produces the same bytes. A SHA-256 content hash is computed; the hash is embedded in the artefact filename so an identical tree reuses the same package within a run.
 
-**Phase 2 — Encrypt (optional).** If `encrypt_to` is set, the artefact is piped through `age --recipient <...>` before it ever reaches a destination. If `age` is missing or fails, the destination fails — it does not fall back to uploading plaintext.
+2. **Encrypt (optional).** If `encrypt_to` is set, the artefact is piped through `age --recipient <...>` before it ever reaches a destination. If `age` is missing or fails, the destination fails — it does not fall back to uploading plaintext.
 
-**Phase 3 — Dispatch.** Each (source, destination) pair is attempted independently. A dead S3 bucket does not prevent the git push that follows.
+3. **Dispatch.** Each (source, destination) pair is attempted independently. A dead S3 bucket does not prevent the git push that follows.
 
-**Phase 4 — Report.** A `RunReport` is returned (or printed as JSON with `--json`). Any failure triggers an HTTPS POST to the configured webhook URL.
+4. **Report.** A `RunReport` is returned (or printed as JSON with `--json`). Any failure triggers an HTTPS POST to the configured webhook URL.
 
 ### Library API
 
